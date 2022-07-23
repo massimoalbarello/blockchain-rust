@@ -13,7 +13,7 @@ pub struct Block {
 
 impl Debug for Block {
     fn fmt (&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "Block[{}]: {} at: {} with: {} and nonce: {}", &self.index, &hex::encode(&self.hash), &self.timestamp, &self.payload, &self.nonce)
+        write!(f, "Block[{}]: {} at: {} with payload: '{}' and nonce: {}", &self.index, &hex::encode(&self.hash), &self.timestamp, &self.payload, &self.nonce)
     }
 }
 
