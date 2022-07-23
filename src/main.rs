@@ -1,10 +1,11 @@
 use blockchainlib::*;
 
 fn main() {
-    let mut block = Block::new(0, 0, vec![0; 32], 0, "Genesis block!".to_owned());
+    let base: u128 = 2;
+    let exponent = 110;
+    let mut block = Block::new(0, 0, vec![0; 32], 0, "Genesis block!".to_owned(), base.pow(exponent));
 
-    let h = block.hash();
-    block.hash = h;
+    block.mine();
     
     println!("{:?}", &block);
 
