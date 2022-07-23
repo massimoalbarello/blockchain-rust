@@ -13,12 +13,21 @@ fn main() {
         blocks: vec![block],
     };
 
-    for i in 1..=10 {
-        let last_block_hash = blockchain.get_last_block_hash();
-        let mut block = Block::new(i, now(), last_block_hash, 0, format!("Block {}!", i).to_owned(), difficulty);
-        block.mine();
-        println!("Mined new block: {:?}", &block);
+    for block_index in 1..=10 {
+        let current_timestamp = now();
 
-        blockchain.append_block(block);
+        if blockchain.verify_last_block(block_index, current_timestamp) {
+            let last_block_hash = blockchain.get_last_block_hash();
+            let mut block = Block::new(block_index, current_timestamp, last_block_hash, 0, format!("Block {}!", block_index).to_owned(), difficulty);
+            
+            block.mine();
+            println!("Mined new block: {:?}", &block);
+
+            blockchain.append_block(block);
+        }
+        else {
+            break;
+        }
+        
     }
 }

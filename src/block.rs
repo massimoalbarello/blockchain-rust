@@ -34,11 +34,15 @@ impl Block {
         for nonce_attempt in 0..(u64::max_value()) {
             self.nonce = nonce_attempt;
             let hash = self.hash();
-            if check_difficulty(&hash, self.difficulty) {
+            if self.check_difficulty(&hash) {
                 self.hash = hash;
                 break;
             };
         }
+    }
+        
+    pub fn check_difficulty(&self, hash: &BlockHash) -> bool {
+        self.difficulty > difficulty_bytes_as_u128(&hash) 
     }
 }
 
@@ -55,8 +59,4 @@ impl Hashable for Block {
 
         bytes
     }
-}
-
-fn check_difficulty(hash: &BlockHash, difficulty: u128) -> bool {
-    difficulty > difficulty_bytes_as_u128(&hash) 
 }
