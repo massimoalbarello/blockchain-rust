@@ -1,46 +1,105 @@
+use std::collections::HashSet;
 use super::*;
+
+#[derive(Debug)]
+pub enum BlockValidationError {
+    MismatchedIndex,
+    InvalidHash,
+    AchronologicalTimestamps,
+    MismatchedPreviousHash,
+    InvalidGenesisBlockFormat,
+    InsufficientInputValue,
+    InvalidCoinbaseTransaction,
+    InvalidInput,
+}
 
 pub struct Blockchain {
     pub blocks: Vec<Block>,
+    pub unspent_outputs: HashSet<Hash>
 }
 
 impl Blockchain {
+    pub fn new () -> Self {
+        Blockchain { 
+            blocks: vec![], 
+            unspent_outputs: HashSet::new(),
+        }
+    }
     pub fn append_block (&mut self, block: Block) {
         self.blocks.push(block);
     }
 
-    pub fn get_last_block_hash (&self) -> BlockHash {
+    pub fn get_last_block_hash (&self) -> Hash {
         self.blocks[self.blocks.len()-1].hash.clone()
     }
 
-    pub fn verify_last_block (&self, new_block_index: u32, new_block_timestamp: u128) -> bool {
-        let last_block = &self.blocks[self.blocks.len()-1];
-        if last_block.index != new_block_index-1 {
-            println!("Not adjacent indeces");
-            return false;
+    pub fn update_with_block (& mut self, block: Block) -> Result<(), BlockValidationError> {
+        let next_available_index = self.blocks.len();
+
+        if block.index != next_available_index as u32 {
+            return Err(BlockValidationError::MismatchedIndex);
         }
-        else if !last_block.check_difficulty(&last_block.hash()) {
-            println!("Hash doesn't match the difficulty");
-            return false;
+        else if !block.check_difficulty(&block.hash()) {
+            return Err(BlockValidationError::InvalidHash);
         }
-        else if last_block.index != 0 {
-            if last_block.timestamp > new_block_timestamp {
-                println!("Time did not increase");
-                return false;
+        else if next_available_index != 0 {
+            let last_block = &self.blocks[next_available_index-1];
+            if block.timestamp <= last_block.timestamp {
+                return Err(BlockValidationError::AchronologicalTimestamps);
             }
-            else if last_block.prev_block_hash != self.blocks[self.blocks.len()-2].hash {
-                println!("Last block has invalid prev_block_hash");
-                return false;
+            else if block.prev_block_hash != last_block.hash {
+                return Err(BlockValidationError::MismatchedPreviousHash);
             }
         }
         else {
-            // genesis block
-            if last_block.prev_block_hash != vec![0; 32] {
-                println!("Genesis block has invalid prev_block_hash"); 
-                return false;
+            if block.prev_block_hash != vec![0; 32] {
+                return Err(BlockValidationError::InvalidGenesisBlockFormat);
             }
         }
-         
-        true
+
+        if let Some((coinbase, transactions)) = block.transactions.split_first() {
+            if !coinbase.is_coinbase() {
+                return Err(BlockValidationError::InvalidCoinbaseTransaction)
+            }
+
+            let mut block_spent: HashSet<Hash> = HashSet::new();
+            let mut block_created: HashSet<Hash> = HashSet::new();
+            let mut total_fee = 0;
+
+            for transaction in transactions {
+                let input_hashes = transaction.input_hashes();
+
+                if !(&input_hashes - &self.unspent_outputs).is_empty() || !(&input_hashes & &block_spent).is_empty() {
+                    return Err(BlockValidationError::InvalidInput);
+                }
+
+                let input_value = transaction.input_value();
+                let output_value = transaction.output_value();
+
+                if output_value > input_value {
+                    return Err(BlockValidationError::InsufficientInputValue);
+                }
+
+                let fee = input_value - output_value;
+                total_fee += fee;
+
+                block_spent.extend(input_hashes);
+                block_created.extend(transaction.output_hashes());
+            }
+
+            if coinbase.output_value() < total_fee {
+                return Err(BlockValidationError::InvalidCoinbaseTransaction);
+            }
+            else {
+                block_created.extend(coinbase.output_hashes());
+            }
+
+            self.unspent_outputs.retain(|output| !block_spent.contains(output));
+            self.unspent_outputs.extend(block_created);
+        }
+
+        self.blocks.push(block);
+
+        Ok(())
     }
 }

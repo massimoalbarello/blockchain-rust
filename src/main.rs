@@ -4,30 +4,64 @@ fn main() {
     let base: u128 = 2;
     let exponent = 120;
     let difficulty: u128 = base.pow(exponent);
-    let mut block = Block::new(0, now(), vec![0; 32], 0, "Genesis block!".to_owned(), difficulty);
     
+    let mut genesis_block = Block::new(0, now(), vec![0;32], vec![
+        Transaction {
+            inputs: vec![],
+            outputs: vec![
+                transaction::Output {
+                    to_addr: "Alice".to_owned(),
+                    value: 50,
+                },
+                transaction::Output {
+                    to_addr: "Bob".to_owned(),
+                    value: 7,
+                }
+            ]
+        }
+    ], difficulty);
+
+    genesis_block.mine();
+
+    println!("Mined genesis block {:?}", &genesis_block);
+
+    let last_hash = genesis_block.hash.clone();
+
+    let mut blockchain = Blockchain::new();
+
+    blockchain.update_with_block(genesis_block).expect("Failed to add genesis block");
+
+    let mut block = Block::new(1, now(), last_hash, vec![
+        Transaction {
+            inputs: vec![],
+            outputs: vec![
+                transaction::Output {
+                    to_addr: "Chris".to_owned(),
+                    value: 100,
+                }
+            ]
+        },
+        Transaction {
+            inputs: vec![
+                blockchain.blocks[0].transactions[0].outputs[0].clone(),
+            ],
+            outputs: vec![
+                transaction::Output {
+                    to_addr: "Alice".to_owned(),
+                    value: 36,
+                },
+                transaction::Output {
+                    to_addr: "Bob".to_owned(),
+                    value: 12,
+                }
+            ]
+        }
+    ], difficulty);
+
     block.mine();
-    println!("Mined geneesis block: {:?}", &block);
 
-    let mut blockchain = Blockchain {
-        blocks: vec![block],
-    };
+    println!("Mined new block {:?}", &block);
 
-    for block_index in 1..=10 {
-        let current_timestamp = now();
+    blockchain.update_with_block(block).expect("Failed to add new block");
 
-        if blockchain.verify_last_block(block_index, current_timestamp) {
-            let last_block_hash = blockchain.get_last_block_hash();
-            let mut block = Block::new(block_index, current_timestamp, last_block_hash, 0, format!("Block {}!", block_index).to_owned(), difficulty);
-            
-            block.mine();
-            println!("Mined new block: {:?}", &block);
-
-            blockchain.append_block(block);
-        }
-        else {
-            break;
-        }
-        
-    }
 }
